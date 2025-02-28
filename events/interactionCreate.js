@@ -52,10 +52,14 @@ module.exports = {
 
                 collector.on('collect', async (m) => {
                     const quantity = parseInt(m.content);
+                    logger.info(`Usuário ${interaction.user.tag} solicitou ${quantity} unidades do produto ${product.name}`);
+
                     if (quantity <= 0) {
+                        logger.warn(`Quantidade inválida (${quantity}) solicitada por ${interaction.user.tag}`);
                         return thread.send('Quantidade inválida.');
                     }
                     if (quantity > product.stock) {
+                        logger.warn(`Estoque insuficiente (${product.stock}) para pedido de ${quantity} unidades por ${interaction.user.tag}`);
                         return thread.send(`Desculpe, só temos ${product.stock} unidades em estoque.`);
                     }
 
@@ -76,6 +80,7 @@ module.exports = {
 
                 await sale.update({ status: 'cancelled' });
                 await thread.send('Compra cancelada.');
+                logger.info(`Compra cancelada por ${interaction.user.tag}`);
                 setTimeout(() => thread.delete(), 5000);
             }
             else if (interaction.customId === 'show_pix') {
@@ -86,6 +91,7 @@ module.exports = {
                     content: `Chave PIX: ${product.pixKey}\nValor: R$ ${sale.totalPrice}\n\nPor favor, envie o comprovante de pagamento.`,
                     ephemeral: true
                 });
+                logger.info(`Chave PIX exibida para ${interaction.user.tag}`);
             }
             else if (interaction.customId === 'confirm_payment') {
                 const thread = interaction.channel;
@@ -94,15 +100,34 @@ module.exports = {
 
                 // Atualizar status da venda
                 await sale.update({ status: 'paid' });
+                logger.info(`Pagamento confirmado para venda #${sale.id}`);
 
                 // Atualizar estoque
                 await product.update({ stock: product.stock - sale.quantity });
+                logger.info(`Estoque atualizado para produto ${product.name}: ${product.stock} unidades restantes`);
 
                 // Adicionar cargo ao comprador
                 if (product.roleId) {
-                    const guild = interaction.guild;
-                    const member = await guild.members.fetch(sale.userId);
-                    await member.roles.add(product.roleId);
+                    try {
+                        const guild = interaction.guild;
+                        const member = await guild.members.fetch(sale.userId);
+                        await member.roles.add(product.roleId);
+                        logger.info(`Cargo adicionado para ${member.user.tag}`);
+                    } catch (error) {
+                        logger.error(`Erro ao adicionar cargo: ${error}`);
+                        await thread.send('Não foi possível adicionar o cargo automaticamente. Por favor, contate um administrador.');
+                    }
+                }
+
+                if (product.feedbackChannelId) {
+                    try {
+                        const feedbackChannel = await interaction.guild.channels.fetch(product.feedbackChannelId);
+                        await feedbackChannel.send(
+                            `Nova compra realizada!\nComprador: ${interaction.user}\nProduto: ${product.name}\nQuantidade: ${sale.quantity}\nValor Total: R$ ${sale.totalPrice}`
+                        );
+                    } catch (error) {
+                        logger.error(`Erro ao enviar feedback: ${error}`);
+                    }
                 }
 
                 await thread.send('Pagamento confirmado! Obrigado pela compra.');
