@@ -52,18 +52,35 @@ for (const file of eventFiles) {
 }
 
 // Configura o backup automático para rodar a cada 6 horas
-cron.schedule('0 */6 * * *', () => {
+const githubToken = process.env.GITHUB_TOKEN;
+
+// Função para executar o backup
+const executeBackup = () => {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
-    exec('git add . && git commit -m "Backup automático ' + timestamp + '" && git push', 
-        (error, stdout, stderr) => {
-            if (error) {
-                logger.error(`Erro no backup: ${error}`);
-                return;
-            }
-            logger.info(`Backup realizado com sucesso: ${stdout}`);
-        });
-});
+    // Configura as credenciais do Git temporariamente
+    const gitCommands = [
+        'git config --global credential.helper store',
+        `git remote set-url origin https://${githubToken}@github.com/DreamBot-GIT/BOT-SALES.git`,
+        'git add .',
+        `git commit -m "Backup automático ${timestamp}"`,
+        'git push origin main'
+    ].join(' && ');
+
+    exec(gitCommands, (error, stdout, stderr) => {
+        if (error) {
+            logger.error(`Erro no backup: ${error}`);
+            return;
+        }
+        logger.info(`Backup realizado com sucesso: ${stdout}`);
+    });
+};
+
+// Agenda o backup para rodar a cada 6 horas
+cron.schedule('0 */6 * * *', executeBackup);
+
+// Executa um backup inicial
+executeBackup();
 
 // Tratamento de erros global
 process.on('unhandledRejection', error => {
