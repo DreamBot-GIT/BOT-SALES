@@ -81,8 +81,8 @@ const executeBackup = () => {
     });
 };
 
-// Agenda o backup para rodar a cada 6 horas
-cron.schedule('0 */6 * * *', executeBackup);
+// Agenda o backup para rodar a cada hora
+cron.schedule('0 * * * *', executeBackup);
 
 // Executa um backup inicial
 executeBackup();
