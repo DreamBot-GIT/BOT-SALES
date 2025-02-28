@@ -6,6 +6,7 @@ const logger = require('./utils/logger');
 const express = require('express');
 const cron = require('node-cron');
 const { exec } = require('child_process');
+const sequelize = require('./models/database');
 
 // Configuração do servidor Express
 const app = express();
@@ -20,7 +21,8 @@ const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMembers
     ]
 });
 
@@ -51,7 +53,7 @@ for (const file of eventFiles) {
     }
 }
 
-// Configura o backup automático para rodar a cada 6 horas
+// Configura o backup automático
 const githubToken = process.env.GITHUB_TOKEN;
 const githubUsername = 'DreamBot-GIT';
 
@@ -86,6 +88,13 @@ cron.schedule('0 * * * *', executeBackup);
 
 // Executa um backup inicial
 executeBackup();
+
+// Sincroniza os modelos com o banco de dados
+sequelize.sync().then(() => {
+    logger.info('Banco de dados sincronizado');
+}).catch(error => {
+    logger.error('Erro ao sincronizar banco de dados:', error);
+});
 
 // Tratamento de erros global
 process.on('unhandledRejection', error => {
