@@ -38,7 +38,9 @@ module.exports = {
                     )
                     .setTimestamp();
 
+                // Deletar a mensagem de seleção após confirmar
                 await interaction.message.delete();
+
                 const productMessage = await interaction.channel.send({
                     embeds: [embed],
                     components: [createProductButtons(product.id)]

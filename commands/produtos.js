@@ -43,17 +43,16 @@ module.exports = {
                 .setColor(0x0099FF)
                 .setTitle('🛍️ Selecione um Produto')
                 .setDescription('Escolha o produto que deseja exibir neste canal')
-                .setFooter({ text: 'Esta mensagem será apagada em 8 segundos' });
+                .setFooter({ text: 'Use o menu para selecionar um produto e depois clique em Confirmar' });
 
             const selectorMessage = await message.channel.send({
                 embeds: [selectorEmbed],
                 components: rows
             });
 
-            // Auto-delete após 8 segundos
+            // Apenas deletar a mensagem do usuário
             setTimeout(() => {
                 message.delete().catch(() => {});
-                selectorMessage.delete().catch(() => {});
             }, 8000);
 
             logger.info(`Menu de seleção de produtos exibido para ${message.author.tag}`);
