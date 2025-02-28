@@ -53,6 +53,7 @@ for (const file of eventFiles) {
 
 // Configura o backup automático para rodar a cada 6 horas
 const githubToken = process.env.GITHUB_TOKEN;
+const githubUsername = 'DreamBot-GIT';
 
 // Função para executar o backup
 const executeBackup = () => {
@@ -60,8 +61,10 @@ const executeBackup = () => {
 
     // Configura as credenciais do Git temporariamente
     const gitCommands = [
+        'git config --global user.email "dreambot.git@gmail.com"',
+        'git config --global user.name "DreamBot-GIT"',
         'git config --global credential.helper store',
-        `git remote set-url origin https://${githubToken}@github.com/DreamBot-GIT/BOT-SALES.git`,
+        `git remote set-url origin https://${githubUsername}:${githubToken}@github.com/DreamBot-GIT/BOT-SALES.git`,
         'git add .',
         `git commit -m "Backup automático ${timestamp}"`,
         'git push origin main'
@@ -70,9 +73,11 @@ const executeBackup = () => {
     exec(gitCommands, (error, stdout, stderr) => {
         if (error) {
             logger.error(`Erro no backup: ${error}`);
+            logger.error(`Detalhes do erro: ${stderr}`);
             return;
         }
-        logger.info(`Backup realizado com sucesso: ${stdout}`);
+        logger.info(`Backup realizado com sucesso`);
+        logger.debug(`Saída do comando Git: ${stdout}`);
     });
 };
 
