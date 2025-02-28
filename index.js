@@ -56,26 +56,32 @@ for (const file of eventFiles) {
 // Configura o backup automático
 const githubToken = process.env.GITHUB_TOKEN;
 const githubUsername = 'DreamBot-GIT';
+const repoName = 'BOT-SALES';
 
 // Função para executar o backup
 const executeBackup = () => {
+    if (!githubToken) {
+        logger.error('Token do GitHub não configurado. Configure GITHUB_TOKEN no arquivo .env');
+        return;
+    }
+
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
     // Configura as credenciais do Git temporariamente
     const gitCommands = [
         'git config --global user.email "dreambot.git@gmail.com"',
         'git config --global user.name "DreamBot-GIT"',
-        'git config --global credential.helper store',
-        `git remote set-url origin https://${githubUsername}:${githubToken}@github.com/DreamBot-GIT/BOT-SALES.git`,
+        `git remote -v || git remote add origin https://${githubUsername}:${githubToken}@github.com/${githubUsername}/${repoName}.git`,
         'git add .',
-        `git commit -m "Backup automático ${timestamp}"`,
-        'git push origin main'
+        `git commit -m "Backup automático ${timestamp}" || echo "Nada para commitar"`,
+        'git push origin HEAD || git push --set-upstream origin main'
     ].join(' && ');
 
+    logger.info('Iniciando backup para o GitHub...');
     exec(gitCommands, (error, stdout, stderr) => {
         if (error) {
             logger.error(`Erro no backup: ${error}`);
-            logger.error(`Detalhes do erro: ${stderr}`);
+            if (stderr) logger.error(`Detalhes do erro: ${stderr}`);
             return;
         }
         logger.info(`Backup realizado com sucesso`);
@@ -83,11 +89,11 @@ const executeBackup = () => {
     });
 };
 
-// Agenda o backup para rodar a cada hora
-cron.schedule('0 * * * *', executeBackup);
+// Agenda o backup para rodar a cada 12 horas (menos frequente para evitar problemas)
+cron.schedule('0 */12 * * *', executeBackup);
 
-// Executa um backup inicial
-executeBackup();
+// Executa um backup inicial após 1 minuto (para dar tempo ao sistema iniciar completamente)
+setTimeout(executeBackup, 60000);
 
 // Sincroniza os modelos com o banco de dados
 sequelize.sync().then(() => {
