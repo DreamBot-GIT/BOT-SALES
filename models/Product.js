@@ -23,6 +23,9 @@ const Product = sequelize.define('Product', {
     },
     roleId: {
         type: DataTypes.STRING
+    },
+    feedbackChannelId: {
+        type: DataTypes.STRING
     }
 });
 
