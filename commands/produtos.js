@@ -1,6 +1,5 @@
 const { Product } = require('../models/index.js');
-const { createProductButtons } = require('../utils/buttons');
-const { ActionRowBuilder, EmbedBuilder } = require('discord.js');
+const { ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, EmbedBuilder } = require('discord.js');
 const logger = require('../utils/logger');
 
 module.exports = {
@@ -11,30 +10,60 @@ module.exports = {
             const products = await Product.findAll();
 
             if (products.length === 0) {
-                return message.reply('Não há produtos cadastrados no momento.');
+                const reply = await message.reply('Não há produtos cadastrados no momento.');
+                setTimeout(() => reply.delete(), 8000);
+                setTimeout(() => message.delete(), 8000);
+                return;
             }
 
-            for (const product of products) {
-                const embed = new EmbedBuilder()
-                    .setColor(0x0099FF)
-                    .setTitle(`🏷️ ${product.name}`)
-                    .setDescription(product.description)
-                    .addFields(
-                        { name: '💰 Preço', value: `R$ ${product.price}`, inline: true },
-                        { name: '📦 Estoque', value: product.stock.toString(), inline: true }
-                    )
-                    .setTimestamp();
+            // Criar menu de seleção
+            const selectMenu = new StringSelectMenuBuilder()
+                .setCustomId('select_product')
+                .setPlaceholder('Escolha um produto para exibir')
+                .addOptions(products.map(product => ({
+                    label: product.name,
+                    description: `R$ ${product.price} - Estoque: ${product.stock}`,
+                    value: product.id.toString(),
+                    emoji: '🏷️'
+                })));
 
-                await message.channel.send({
-                    embeds: [embed],
-                    components: [createProductButtons(product.id)]
-                });
-            }
+            // Criar botão de confirmação
+            const confirmButton = new ButtonBuilder()
+                .setCustomId('confirm_product')
+                .setLabel('Confirmar Seleção')
+                .setStyle('Primary')
+                .setEmoji('✅');
 
-            logger.info(`Lista de produtos exibida para ${message.author.tag}`);
+            const rows = [
+                new ActionRowBuilder().addComponents(selectMenu),
+                new ActionRowBuilder().addComponents(confirmButton)
+            ];
+
+            const selectorEmbed = new EmbedBuilder()
+                .setColor(0x0099FF)
+                .setTitle('🛍️ Selecione um Produto')
+                .setDescription('Escolha o produto que deseja exibir neste canal')
+                .setFooter({ text: 'Esta mensagem será apagada em 8 segundos' });
+
+            const selectorMessage = await message.channel.send({
+                embeds: [selectorEmbed],
+                components: rows
+            });
+
+            // Auto-delete após 8 segundos
+            setTimeout(() => {
+                message.delete().catch(() => {});
+                selectorMessage.delete().catch(() => {});
+            }, 8000);
+
+            logger.info(`Menu de seleção de produtos exibido para ${message.author.tag}`);
         } catch (error) {
             logger.error('Erro ao listar produtos:', error);
-            await message.reply('Ocorreu um erro ao listar os produtos.');
+            const errorMsg = await message.reply('Ocorreu um erro ao listar os produtos.');
+            setTimeout(() => {
+                message.delete().catch(() => {});
+                errorMsg.delete().catch(() => {});
+            }, 8000);
         }
     },
 };

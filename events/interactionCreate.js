@@ -1,16 +1,59 @@
 const { Product, Sale, Cart } = require('../models/index.js');
-const { createConfirmationButtons, createPaymentButtons, createCartActionButtons } = require('../utils/buttons');
+const { createProductButtons, createCartActionButtons, createConfirmationButtons, createPaymentButtons } = require('../utils/buttons');
 const { EmbedBuilder } = require('discord.js');
 const logger = require('../utils/logger');
 
 module.exports = {
     name: 'interactionCreate',
     async execute(interaction) {
-        if (!interaction.isButton()) return;
+        if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
 
         try {
+            // Novo handler para seleção de produto
+            if (interaction.customId === 'select_product') {
+                // Armazenar o ID do produto selecionado
+                interaction.client.selectedProduct = await Product.findByPk(interaction.values[0]);
+                await interaction.reply({ 
+                    content: `Produto "${interaction.client.selectedProduct.name}" selecionado. Clique em Confirmar para exibir.`, 
+                    ephemeral: true 
+                });
+            }
+            // Novo handler para confirmação de exibição
+            else if (interaction.customId === 'confirm_product') {
+                const product = interaction.client.selectedProduct;
+                if (!product) {
+                    return interaction.reply({ 
+                        content: 'Por favor, selecione um produto primeiro.', 
+                        ephemeral: true 
+                    });
+                }
+
+                const embed = new EmbedBuilder()
+                    .setColor(0x0099FF)
+                    .setTitle(`🏷️ ${product.name}`)
+                    .setDescription(product.description)
+                    .addFields(
+                        { name: '💰 Preço', value: `R$ ${product.price}`, inline: true },
+                        { name: '📦 Estoque', value: product.stock.toString(), inline: true }
+                    )
+                    .setTimestamp();
+
+                await interaction.message.delete();
+                const productMessage = await interaction.channel.send({
+                    embeds: [embed],
+                    components: [createProductButtons(product.id)]
+                });
+
+                await interaction.reply({ 
+                    content: 'Produto exibido com sucesso!', 
+                    ephemeral: true 
+                });
+
+                // Limpar a seleção
+                interaction.client.selectedProduct = null;
+            }
             // Carrinho
-            if (interaction.customId.startsWith('cart_add_')) {
+            else if (interaction.customId.startsWith('cart_add_')) {
                 const productId = interaction.customId.split('_')[2];
                 const product = await Product.findByPk(productId);
 
