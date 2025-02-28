@@ -1,11 +1,11 @@
 const { Product } = require('../models/index.js');
-const { createBuyButton } = require('../utils/buttons');
+const { createProductButtons } = require('../utils/buttons');
 const { ActionRowBuilder, EmbedBuilder } = require('discord.js');
 const logger = require('../utils/logger');
 
 module.exports = {
     name: 'produtos',
-    description: 'Lista todos os produtos disponíveis para venda',
+    description: '🛍️ Lista todos os produtos disponíveis para venda',
     async execute(message) {
         try {
             const products = await Product.findAll();
@@ -17,18 +17,18 @@ module.exports = {
             for (const product of products) {
                 const embed = new EmbedBuilder()
                     .setColor(0x0099FF)
-                    .setTitle(product.name)
+                    .setTitle(`🏷️ ${product.name}`)
                     .setDescription(product.description)
                     .addFields(
-                        { name: 'Preço', value: `R$ ${product.price}`, inline: true },
-                        { name: 'Estoque', value: product.stock.toString(), inline: true }
+                        { name: '💰 Preço', value: `R$ ${product.price}`, inline: true },
+                        { name: '📦 Estoque', value: product.stock.toString(), inline: true }
                     )
                     .setTimestamp();
 
-                const row = new ActionRowBuilder()
-                    .addComponents(createBuyButton(product.id));
-
-                await message.channel.send({ embeds: [embed], components: [row] });
+                await message.channel.send({
+                    embeds: [embed],
+                    components: [createProductButtons(product.id)]
+                });
             }
 
             logger.info(`Lista de produtos exibida para ${message.author.tag}`);

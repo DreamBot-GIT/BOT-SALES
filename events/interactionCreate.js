@@ -1,5 +1,6 @@
-const { Product, Sale } = require('../models/index.js');
-const { createConfirmationButtons, createPaymentButtons } = require('../utils/buttons');
+const { Product, Sale, Cart } = require('../models/index.js');
+const { createConfirmationButtons, createPaymentButtons, createCartActionButtons } = require('../utils/buttons');
+const { EmbedBuilder } = require('discord.js');
 const logger = require('../utils/logger');
 
 module.exports = {
@@ -8,7 +9,124 @@ module.exports = {
         if (!interaction.isButton()) return;
 
         try {
-            if (interaction.customId.startsWith('buy_')) {
+            // Carrinho
+            if (interaction.customId.startsWith('cart_add_')) {
+                const productId = interaction.customId.split('_')[2];
+                const product = await Product.findByPk(productId);
+
+                if (!product) {
+                    return interaction.reply({ content: 'Produto não encontrado.', ephemeral: true });
+                }
+
+                let [cart] = await Cart.findOrCreate({
+                    where: { userId: interaction.user.id },
+                    defaults: { items: [], totalPrice: 0 }
+                });
+
+                const items = cart.items;
+                const existingItem = items.find(item => item.productId === productId);
+
+                if (existingItem) {
+                    existingItem.quantity += 1;
+                } else {
+                    items.push({
+                        productId,
+                        name: product.name,
+                        price: product.price,
+                        quantity: 1
+                    });
+                }
+
+                const totalPrice = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+                await cart.update({
+                    items,
+                    totalPrice
+                });
+
+                logger.info(`Item adicionado ao carrinho de ${interaction.user.tag}`);
+                await interaction.reply({ content: `${product.name} adicionado ao carrinho!`, ephemeral: true });
+            }
+            else if (interaction.customId === 'cart_view') {
+                const cart = await Cart.findOne({ where: { userId: interaction.user.id } });
+
+                if (!cart || cart.items.length === 0) {
+                    return interaction.reply({ content: 'Seu carrinho está vazio!', ephemeral: true });
+                }
+
+                const embed = new EmbedBuilder()
+                    .setColor(0x0099FF)
+                    .setTitle('🛒 Seu Carrinho')
+                    .setDescription(
+                        cart.items.map(item =>
+                            `**${item.name}**\nQuantidade: ${item.quantity}\nPreço: R$ ${item.price * item.quantity}`
+                        ).join('\n\n')
+                    )
+                    .addFields({ name: '💰 Total', value: `R$ ${cart.totalPrice}` })
+                    .setTimestamp();
+
+                await interaction.reply({
+                    embeds: [embed],
+                    components: [createCartActionButtons()],
+                    ephemeral: true
+                });
+            }
+            else if (interaction.customId === 'cart_clear') {
+                await Cart.destroy({ where: { userId: interaction.user.id } });
+                await interaction.reply({ content: 'Carrinho limpo!', ephemeral: true });
+            }
+            else if (interaction.customId === 'cart_close') {
+                await interaction.reply({ content: 'Carrinho fechado!', ephemeral: true });
+            }
+            else if (interaction.customId === 'cart_buy') {
+                const cart = await Cart.findOne({ where: { userId: interaction.user.id } });
+
+                if (!cart || cart.items.length === 0) {
+                    return interaction.reply({ content: 'Seu carrinho está vazio!', ephemeral: true });
+                }
+
+                // Criar thread para a compra do carrinho
+                const thread = await interaction.channel.threads.create({
+                    name: `compra-carrinho-${interaction.user.username}`,
+                    autoArchiveDuration: 480,
+                    reason: 'Thread de compra do carrinho'
+                });
+
+                // Criar venda para cada item do carrinho
+                for (const item of cart.items) {
+                    await Sale.create({
+                        userId: interaction.user.id,
+                        productId: item.productId,
+                        quantity: item.quantity,
+                        totalPrice: item.price * item.quantity,
+                        threadId: thread.id
+                    });
+                }
+
+                const embed = new EmbedBuilder()
+                    .setColor(0x0099FF)
+                    .setTitle('🛍️ Confirmação de Compra')
+                    .setDescription(
+                        cart.items.map(item =>
+                            `**${item.name}**\nQuantidade: ${item.quantity}\nPreço: R$ ${item.price * item.quantity}`
+                        ).join('\n\n')
+                    )
+                    .addFields({ name: '💰 Total', value: `R$ ${cart.totalPrice}` });
+
+                await thread.send({
+                    content: `Olá ${interaction.user}! Confirme sua compra:`,
+                    embeds: [embed],
+                    components: [createConfirmationButtons()]
+                });
+
+                // Limpar o carrinho após iniciar a compra
+                await cart.destroy();
+
+                await interaction.reply({ content: `Sua compra foi iniciada em ${thread}`, ephemeral: true });
+                logger.info(`Nova thread de compra de carrinho criada para ${interaction.user.tag}`);
+            }
+            // Compra normal
+            else if (interaction.customId.startsWith('buy_')) {
                 const productId = interaction.customId.split('_')[1];
                 const product = await Product.findByPk(productId);
 
